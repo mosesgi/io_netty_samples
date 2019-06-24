@@ -6,6 +6,11 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+/**
+ * Demonstrates how the ByteBuffer works using array.
+ * @author mosesji
+ *
+ */
 public class BufferDemo {
 	public String getClasspathFile(String fileName) {
 		URL resource = this.getClass().getResource("/" + fileName);
