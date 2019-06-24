@@ -69,4 +69,9 @@ public class AIOServer {
 			e.printStackTrace();
 		}
 	}
+	
+	public static void main(String[] args) {
+		int port = 8000;
+		new AIOServer(port);
+	}
 }
