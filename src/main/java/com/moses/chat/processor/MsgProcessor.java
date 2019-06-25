@@ -17,131 +17,145 @@ import io.netty.util.concurrent.GlobalEventExecutor;
  *
  */
 public class MsgProcessor {
-	
-	//记录在线用户
+
+	// 记录在线用户
 	private static ChannelGroup onlineUsers = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-	
-	//定义一些扩展属性
+
+	// 定义一些扩展属性
 	private final AttributeKey<String> NICK_NAME = AttributeKey.valueOf("nickName");
 	private final AttributeKey<String> IP_ADDR = AttributeKey.valueOf("ipAddr");
 	private final AttributeKey<JSONObject> ATTRS = AttributeKey.valueOf("attrs");
 	public static final AttributeKey<String> CLIENT_TYPE = AttributeKey.valueOf("clientType");
-	
+
 	private MessageConverter converter = new MessageConverter();
+
 	/**
 	 * 获取用户昵称
+	 * 
 	 * @param client
 	 * @return
 	 */
-	public String getNickName(Channel client){
+	public String getNickName(Channel client) {
 		return client.attr(NICK_NAME).get();
 	}
+
 	/**
 	 * 获取用户远程IP地址
+	 * 
 	 * @param client
 	 * @return
 	 */
-	public String getAddress(Channel client){
-		return client.remoteAddress().toString().replaceFirst("/","");
+	public String getAddress(Channel client) {
+		return client.remoteAddress().toString().replaceFirst("/", "");
 	}
-	
+
 	/**
 	 * 获取扩展属性
+	 * 
 	 * @param client
 	 * @return
 	 */
-	public JSONObject getAttrs(Channel client){
-		try{
+	public JSONObject getAttrs(Channel client) {
+		try {
 			return client.attr(ATTRS).get();
-		}catch(Exception e){
+		} catch (Exception e) {
 			return null;
 		}
 	}
-	
+
 	/**
 	 * 获取扩展属性
+	 * 
 	 * @param client
 	 * @return
 	 */
-	private void setAttrs(Channel client,String key,Object value){
-		try{
+	private void setAttrs(Channel client, String key, Object value) {
+		try {
 			JSONObject json = client.attr(ATTRS).get();
 			json.put(key, value);
 			client.attr(ATTRS).set(json);
-		}catch(Exception e){
+		} catch (Exception e) {
 			JSONObject json = new JSONObject();
 			json.put(key, value);
 			client.attr(ATTRS).set(json);
 		}
 	}
-	
+
 	/**
 	 * 登出通知
+	 * 
 	 * @param client
 	 */
-	public void logout(Channel client){
-		//如果nickName为null，没有遵从聊天协议的连接，表示未非法登录
-		if(getNickName(client) == null){ return; }
+	public void logout(Channel client) {
+		// 如果nickName为null，没有遵从聊天协议的连接，表示未非法登录
+		if (getNickName(client) == null) {
+			return;
+		}
 		for (Channel channel : onlineUsers) {
-			IMMessage request = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), getNickName(client) + "离开");
-			String content = converter.encode(request);
-			channel.writeAndFlush(new TextWebSocketFrame(content));
+			IMMessage msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(),
+					getNickName(client) + "离开");
+			writeAndFlush(channel, msgObj);
 		}
 		onlineUsers.remove(client);
 	}
-	
+
 	/**
 	 * 发送消息
+	 * 
 	 * @param client
 	 * @param msg
 	 */
-	public void sendMsg(Channel client,IMMessage msg){
+	public void sendMsg(Channel client, IMMessage msg) {
 		sendMsg(client, converter.encode(msg));
 	}
-	
+
 	/**
 	 * 发送消息
+	 * 
 	 * @param client
 	 * @param msg
 	 */
-	public void sendMsg(Channel client,String msg){
+	public void sendMsg(Channel client, String msg) {
 		IMMessage msgObj = converter.decode(msg);
-		if(null == msgObj){ return; }
-		
+		if (null == msgObj) {
+			return;
+		}
+
 		String addr = getAddress(client);
-		
-		if(msgObj.getCmd().equals(IMP.LOGIN.getName())){
+
+		if (msgObj.getCmd().equals(IMP.LOGIN.getName())) {
 			client.attr(NICK_NAME).getAndSet(msgObj.getSender());
 			client.attr(IP_ADDR).getAndSet(addr);
 			onlineUsers.add(client);
-			
+
 			for (Channel channel : onlineUsers) {
-				if(channel != client){
-					msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), getNickName(client) + "加入");
-				}else{
+				if (channel != client) {
+					msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(),
+							getNickName(client) + "加入");
+				} else {
 					msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), "已与服务器建立连接！");
 				}
 				writeAndFlush(channel, msgObj);
 			}
-		}else if(msgObj.getCmd().equals(IMP.CHAT.getName())){
+		} else if (msgObj.getCmd().equals(IMP.CHAT.getName())) {
 			for (Channel channel : onlineUsers) {
 				if (channel == client) {
 					msgObj.setSender("you");
-				}else{
+				} else {
 					msgObj.setSender(getNickName(client));
 				}
 				msgObj.setTime(sysTime());
 				writeAndFlush(channel, msgObj);
 			}
-		}else if(msgObj.getCmd().equals(IMP.FLOWER.getName())){
+		} else if (msgObj.getCmd().equals(IMP.FLOWER.getName())) {
 			JSONObject attrs = getAttrs(client);
 			long currTime = sysTime();
-			if(null != attrs){
+			if (null != attrs) {
 				long lastTime = attrs.getLongValue("lastFlowerTime");
-				//60秒之内不允许重复刷鲜花
+				// 60秒之内不允许重复刷鲜花
 				int secends = 10;
 				long sub = currTime - lastTime;
-				if(sub < 1000 * secends){
+				if (sub < 1000 * secends) {
 					msgObj.setSender("you");
 					msgObj.setCmd(IMP.SYSTEM.getName());
 					msgObj.setContent("您送鲜花太频繁," + (secends - Math.round(sub / 1000)) + "秒后再试");
@@ -150,38 +164,40 @@ public class MsgProcessor {
 					return;
 				}
 			}
-			
-			//正常送花
+
+			// 正常送花
 			for (Channel channel : onlineUsers) {
 				if (channel == client) {
 					msgObj.setSender("you");
 					msgObj.setContent("你给大家送了一波鲜花雨");
 					setAttrs(client, "lastFlowerTime", currTime);
-				}else{
+				} else {
 					msgObj.setSender(getNickName(client));
 					msgObj.setContent(getNickName(client) + "送来一波鲜花雨");
 				}
 				msgObj.setTime(sysTime());
-				
+
 				writeAndFlush(channel, msgObj);
 			}
 		}
 	}
+
 	private void writeAndFlush(Channel channel, IMMessage msgObj) {
 		String content = converter.encode(msgObj);
-		if(ClientType.WEB.name().equals(channel.attr(MsgProcessor.CLIENT_TYPE).get())) {
+		if (ClientType.WEB.name().equals(channel.attr(MsgProcessor.CLIENT_TYPE).get())) {
 			channel.writeAndFlush(new TextWebSocketFrame(content));
 		} else {
 			channel.writeAndFlush(msgObj);
 		}
 	}
-	
+
 	/**
 	 * 获取系统时间
+	 * 
 	 * @return
 	 */
-	private Long sysTime(){
+	private Long sysTime() {
 		return System.currentTimeMillis();
 	}
-	
+
 }
