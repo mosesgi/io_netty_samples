@@ -1,6 +1,7 @@
 package com.moses.chat.processor;
 
 import com.alibaba.fastjson.JSONObject;
+import com.moses.chat.protocol.ClientType;
 import com.moses.chat.protocol.IMMessage;
 import com.moses.chat.protocol.IMP;
 
@@ -24,6 +25,7 @@ public class MsgProcessor {
 	private final AttributeKey<String> NICK_NAME = AttributeKey.valueOf("nickName");
 	private final AttributeKey<String> IP_ADDR = AttributeKey.valueOf("ipAddr");
 	private final AttributeKey<JSONObject> ATTRS = AttributeKey.valueOf("attrs");
+	public static final AttributeKey<String> CLIENT_TYPE = AttributeKey.valueOf("clientType");
 	
 	private MessageConverter converter = new MessageConverter();
 	/**
@@ -119,8 +121,7 @@ public class MsgProcessor {
 				}else{
 					msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), "已与服务器建立连接！");
 				}
-				String content = converter.encode(msgObj);
-				channel.writeAndFlush(new TextWebSocketFrame(content));
+				writeAndFlush(channel, msgObj);
 			}
 		}else if(msgObj.getCmd().equals(IMP.CHAT.getName())){
 			for (Channel channel : onlineUsers) {
@@ -130,8 +131,7 @@ public class MsgProcessor {
 					msgObj.setSender(getNickName(client));
 				}
 				msgObj.setTime(sysTime());
-				String content = converter.encode(msgObj);
-				channel.writeAndFlush(new TextWebSocketFrame(content));
+				writeAndFlush(channel, msgObj);
 			}
 		}else if(msgObj.getCmd().equals(IMP.FLOWER.getName())){
 			JSONObject attrs = getAttrs(client);
@@ -163,9 +163,16 @@ public class MsgProcessor {
 				}
 				msgObj.setTime(sysTime());
 				
-				String content = converter.encode(msgObj);
-				channel.writeAndFlush(new TextWebSocketFrame(content));
+				writeAndFlush(channel, msgObj);
 			}
+		}
+	}
+	private void writeAndFlush(Channel channel, IMMessage msgObj) {
+		String content = converter.encode(msgObj);
+		if(ClientType.WEB.name().equals(channel.attr(MsgProcessor.CLIENT_TYPE).get())) {
+			channel.writeAndFlush(new TextWebSocketFrame(content));
+		} else {
+			channel.writeAndFlush(msgObj);
 		}
 	}
 	

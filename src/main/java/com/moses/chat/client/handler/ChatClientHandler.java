@@ -75,8 +75,29 @@ public class ChatClientHandler extends ChannelInboundHandlerAdapter {
 	 */
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws IOException {
+		if(msg == null) {
+			return;
+		}
 		IMMessage m = (IMMessage) msg;
-		LOG.info(m);
+		IMP cmd = IMP.parseName(m.getCmd());
+		String result = null;
+		switch(cmd) {
+			case CHAT:
+				result = String.format("%s 发来消息: %s", m.getSender(), m.getContent());
+				break;
+			case SYSTEM:
+				result = String.format("系统消息: %s" , m.getContent());
+				break;
+			case LOGIN:
+				result = String.format("%s 已经登录!", m.getSender());
+				break;
+			case FLOWER:
+				result = String.format("%s 发来鲜花！敬请脑补...", m.getSender());
+				break;
+			case LOGOUT:
+				result = String.format("%s 退出登录.", m.getSender());
+		}
+		LOG.info(result);
 	}
 
 	/**

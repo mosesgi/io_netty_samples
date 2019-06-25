@@ -1,9 +1,11 @@
-package com.moses.chat.client.handler;
+package com.moses.chat.client;
 
 import java.io.IOException;
 
+import com.moses.chat.client.handler.ChatClientHandler;
 import com.moses.chat.protocol.IMDecoder;
 import com.moses.chat.protocol.IMEncoder;
+import com.moses.chat.server.handler.SocketHandler;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -44,6 +46,7 @@ public class ChatClient {
 				public void initChannel(SocketChannel ch) throws Exception {
 					ch.pipeline().addLast(new IMDecoder());
 					ch.pipeline().addLast(new IMEncoder());
+					
 					ch.pipeline().addLast(clientHandler);
 				}
 			});

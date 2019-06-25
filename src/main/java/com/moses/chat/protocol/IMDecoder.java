@@ -5,6 +5,8 @@ import java.util.List;
 import org.msgpack.MessagePack;
 import org.msgpack.MessageTypeException;
 
+import com.moses.chat.processor.MsgProcessor;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
@@ -29,9 +31,11 @@ public class IMDecoder extends ByteToMessageDecoder {
 
 			in.getBytes(in.readerIndex(), array, 0, length);
 			out.add(new MessagePack().read(array, IMMessage.class));
+			ctx.channel().attr(MsgProcessor.CLIENT_TYPE).setIfAbsent(ClientType.TERIMNAL.name());
 			in.clear();
 		} catch (MessageTypeException e) {
 			ctx.channel().pipeline().remove(this);
+			ctx.channel().attr(MsgProcessor.CLIENT_TYPE).setIfAbsent(ClientType.WEB.name());
 		}
 	}
 
