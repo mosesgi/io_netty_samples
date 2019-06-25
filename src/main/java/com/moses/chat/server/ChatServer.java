@@ -5,6 +5,8 @@ import org.apache.log4j.Logger;
 import com.moses.chat.protocol.IMDecoder;
 import com.moses.chat.protocol.IMEncoder;
 import com.moses.chat.server.handler.HttpHandler;
+import com.moses.chat.server.handler.SocketHandler;
+import com.moses.chat.server.handler.WebSocketHandler;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -17,12 +19,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 
 public class ChatServer {
 	private static Logger LOG = Logger.getLogger(ChatServer.class);
 
-	private int port = 8080;
+	private int port = 80;
 
 	public void start() {
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
@@ -36,11 +39,12 @@ public class ChatServer {
 						protected void initChannel(SocketChannel ch) throws Exception {
 							ChannelPipeline pipeline = ch.pipeline();
 
-							/** 解析自定义协议 */
+							//用于java terminal
 							pipeline.addLast(new IMDecoder());
 							pipeline.addLast(new IMEncoder());
+							pipeline.addLast(new SocketHandler());
 							
-							/** 解析Http请求 */
+							//http requests
 		            		pipeline.addLast(new HttpServerCodec());
 		            		//主要是将同一个http请求或响应的多个消息对象变成一个 fullHttpRequest完整的消息对象
 		            		pipeline.addLast(new HttpObjectAggregator(64 * 1024));
@@ -48,6 +52,9 @@ public class ChatServer {
 		            		pipeline.addLast(new ChunkedWriteHandler());
 		            		pipeline.addLast(new HttpHandler());
 							
+		            		//webSocket requests
+		            		pipeline.addLast(new WebSocketServerProtocolHandler("/im"));
+		            		pipeline.addLast(new WebSocketHandler());
 						}
 
 					});

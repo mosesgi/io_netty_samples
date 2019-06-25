@@ -1,8 +1,6 @@
 package com.moses.chat.processor;
 
 import com.alibaba.fastjson.JSONObject;
-import com.moses.chat.protocol.IMDecoder;
-import com.moses.chat.protocol.IMEncoder;
 import com.moses.chat.protocol.IMMessage;
 import com.moses.chat.protocol.IMP;
 
@@ -27,11 +25,7 @@ public class MsgProcessor {
 	private final AttributeKey<String> IP_ADDR = AttributeKey.valueOf("ipAddr");
 	private final AttributeKey<JSONObject> ATTRS = AttributeKey.valueOf("attrs");
 	
-	//自定义解码器
-	private IMDecoder decoder = new IMDecoder();
-	//自定义编码器
-	private IMEncoder encoder = new IMEncoder();
-	
+	private MessageConverter converter = new MessageConverter();
 	/**
 	 * 获取用户昵称
 	 * @param client
@@ -88,7 +82,7 @@ public class MsgProcessor {
 		if(getNickName(client) == null){ return; }
 		for (Channel channel : onlineUsers) {
 			IMMessage request = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), getNickName(client) + "离开");
-			String content = encoder.encode(request);
+			String content = converter.encode(request);
 			channel.writeAndFlush(new TextWebSocketFrame(content));
 		}
 		onlineUsers.remove(client);
@@ -100,7 +94,7 @@ public class MsgProcessor {
 	 * @param msg
 	 */
 	public void sendMsg(Channel client,IMMessage msg){
-		sendMsg(client,encoder.encode(msg));
+		sendMsg(client, converter.encode(msg));
 	}
 	
 	/**
@@ -109,37 +103,37 @@ public class MsgProcessor {
 	 * @param msg
 	 */
 	public void sendMsg(Channel client,String msg){
-		IMMessage request = decoder.decode(msg);
-		if(null == request){ return; }
+		IMMessage msgObj = converter.decode(msg);
+		if(null == msgObj){ return; }
 		
 		String addr = getAddress(client);
 		
-		if(request.getCmd().equals(IMP.LOGIN.getName())){
-			client.attr(NICK_NAME).getAndSet(request.getSender());
+		if(msgObj.getCmd().equals(IMP.LOGIN.getName())){
+			client.attr(NICK_NAME).getAndSet(msgObj.getSender());
 			client.attr(IP_ADDR).getAndSet(addr);
 			onlineUsers.add(client);
 			
 			for (Channel channel : onlineUsers) {
 				if(channel != client){
-					request = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), getNickName(client) + "加入");
+					msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), getNickName(client) + "加入");
 				}else{
-					request = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), "已与服务器建立连接！");
+					msgObj = new IMMessage(IMP.SYSTEM.getName(), sysTime(), onlineUsers.size(), "已与服务器建立连接！");
 				}
-				String content = encoder.encode(request);
+				String content = converter.encode(msgObj);
 				channel.writeAndFlush(new TextWebSocketFrame(content));
 			}
-		}else if(request.getCmd().equals(IMP.CHAT.getName())){
+		}else if(msgObj.getCmd().equals(IMP.CHAT.getName())){
 			for (Channel channel : onlineUsers) {
 				if (channel == client) {
-					request.setSender("you");
+					msgObj.setSender("you");
 				}else{
-					request.setSender(getNickName(client));
+					msgObj.setSender(getNickName(client));
 				}
-				request.setTime(sysTime());
-				String content = encoder.encode(request);
+				msgObj.setTime(sysTime());
+				String content = converter.encode(msgObj);
 				channel.writeAndFlush(new TextWebSocketFrame(content));
 			}
-		}else if(request.getCmd().equals(IMP.FLOWER.getName())){
+		}else if(msgObj.getCmd().equals(IMP.FLOWER.getName())){
 			JSONObject attrs = getAttrs(client);
 			long currTime = sysTime();
 			if(null != attrs){
@@ -148,10 +142,10 @@ public class MsgProcessor {
 				int secends = 10;
 				long sub = currTime - lastTime;
 				if(sub < 1000 * secends){
-					request.setSender("you");
-					request.setCmd(IMP.SYSTEM.getName());
-					request.setContent("您送鲜花太频繁," + (secends - Math.round(sub / 1000)) + "秒后再试");
-					String content = encoder.encode(request);
+					msgObj.setSender("you");
+					msgObj.setCmd(IMP.SYSTEM.getName());
+					msgObj.setContent("您送鲜花太频繁," + (secends - Math.round(sub / 1000)) + "秒后再试");
+					String content = converter.encode(msgObj);
 					client.writeAndFlush(new TextWebSocketFrame(content));
 					return;
 				}
@@ -160,16 +154,16 @@ public class MsgProcessor {
 			//正常送花
 			for (Channel channel : onlineUsers) {
 				if (channel == client) {
-					request.setSender("you");
-					request.setContent("你给大家送了一波鲜花雨");
+					msgObj.setSender("you");
+					msgObj.setContent("你给大家送了一波鲜花雨");
 					setAttrs(client, "lastFlowerTime", currTime);
 				}else{
-					request.setSender(getNickName(client));
-					request.setContent(getNickName(client) + "送来一波鲜花雨");
+					msgObj.setSender(getNickName(client));
+					msgObj.setContent(getNickName(client) + "送来一波鲜花雨");
 				}
-				request.setTime(sysTime());
+				msgObj.setTime(sysTime());
 				
-				String content = encoder.encode(request);
+				String content = converter.encode(msgObj);
 				channel.writeAndFlush(new TextWebSocketFrame(content));
 			}
 		}
